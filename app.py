@@ -47,13 +47,14 @@ except OSError:
 
 # Lazy load RAG summarization to handle import errors
 def get_rag_summarization():
-    try:
-        from agentrag.ragagent import agentic_rag_summarization
-        return agentic_rag_summarization
-    except ImportError as e:
-        logger.error(f"Failed to import RAG summarization: {str(e)}")
-        st.error("Error loading summarization module. Some features may be unavailable.")
-        return None
+    print("Click for summarization...")
+    # try:
+    #     from agentrag.ragagent import agentic_rag_summarization
+    #     return agentic_rag_summarization
+    # except ImportError as e:
+    #     logger.error(f"Failed to import RAG summarization: {str(e)}")
+    #     st.error("Error loading summarization module. Some features may be unavailable.")
+    #     return None
 
 # Initialize Whisper models and processors
 @st.cache_resource
@@ -425,29 +426,29 @@ def main():
             # Original RAG summarization
             if not st.session_state.summaries:
                 rag_summarize = get_rag_summarization()
-                if rag_summarize:
-                    try:
-                        with st.spinner("Generating RAG summaries..."):
-                            st.session_state.summaries = rag_summarize(st.session_state.transcription)
+        #         if rag_summarize:
+        #             try:
+        #                 with st.spinner("Generating RAG summaries..."):
+        #                     st.session_state.summaries = rag_summarize(st.session_state.transcription)
                         
-                        st.subheader("RAG Analysis")
-                        st.write("**Keywords:**", ", ".join(st.session_state.summaries["keywords"]))
-                        st.write("**Entities:**", ", ".join(st.session_state.summaries["entities"]))
+        #                 st.subheader("RAG Analysis")
+        #                 st.write("**Keywords:**", ", ".join(st.session_state.summaries["keywords"]))
+        #                 st.write("**Entities:**", ", ".join(st.session_state.summaries["entities"]))
                         
-                        with st.expander("View RAG Summaries"):
-                            st.write("**Pegasus Summary:**")
-                            st.write(st.session_state.summaries["pegasus_summary"])
+        #                 with st.expander("View RAG Summaries"):
+        #                     st.write("**Pegasus Summary:**")
+        #                     st.write(st.session_state.summaries["pegasus_summary"])
                             
-                            st.write("**BERTSUM Summary:**")
-                            st.write(st.session_state.summaries["bertsum_summary"])
+        #                     st.write("**BERTSUM Summary:**")
+        #                     st.write(st.session_state.summaries["bertsum_summary"])
                             
-                            st.write("**TextRank Summary:**")
-                            st.write(st.session_state.summaries["textrank_summary"])
-                    except Exception as e:
-                        logger.error(f"Error during summarization: {str(e)}")
-                        st.error(f"An error occurred during summarization: {str(e)}")
-        else:
-            st.warning("Please transcribe a video/audio file first!")
+        #                     st.write("**TextRank Summary:**")
+        #                     st.write(st.session_state.summaries["textrank_summary"])
+        #             except Exception as e:
+        #                 logger.error(f"Error during summarization: {str(e)}")
+        #                 st.error(f"An error occurred during summarization: {str(e)}")
+        # else:
+        #     st.warning("Please transcribe a video/audio file first!")
 
     elif page == "Chat":
         if st.session_state.transcription:
