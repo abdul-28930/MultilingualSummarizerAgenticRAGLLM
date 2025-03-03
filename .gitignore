@@ -1,0 +1,119 @@
+# Environment variables
+.env
+.env.*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+ENV/
+.venv/
+.env/
+final/
+agentrag/
+/agentrag/
+/agentrag
+agentrag
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb_checkpoints/
+*.ipynb
+
+# Project specific
+models/
+whisper-small-*/
+*.wav
+*.mp3
+*.ogg
+*.flac
+test_api.py
+check_env.py
+**/test_files/
+**/sample_data/
+
+# Logs and databases
+*.log
+logs/
+temp/
+tmp/
+*.sqlite
+*.db
+
+# Docker
+.docker/
+docker-compose.override.yml
+
+# System Files
+Thumbs.db
+
+# Tensorboard
+runs/
+events.out.tfevents.*
+
+# Supabase
+supabase/.branches/
+supabase/.temp/
+
+# Model checkpoints and cache
+*.pt
+*.pth
+*.bin
+.cache/
+checkpoint-*/
+wandb/
+nltk_data/
+*.onnx
+*.model
+**/cache/
+**/.cache/
+transformers_cache/
+.transformers_cache/
+
+# Test coverage
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# Large media files
+*.mp4
+*.avi
+*.mov
+*.flv
+*.mkv
