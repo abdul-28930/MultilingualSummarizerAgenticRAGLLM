@@ -7,6 +7,7 @@ create table documents (
     content text,
     embedding vector(1536),
     metadata jsonb,
+    keywords text[],
     chunk_index integer,
     total_chunks integer,
     created_at timestamp with time zone
@@ -19,6 +20,7 @@ create or replace function match_documents (
 ) returns table (
     id bigint,
     content text,
+    keywords text[],
     similarity float
 )
 language plpgsql
@@ -28,6 +30,7 @@ begin
     select
         id,
         content,
+        keywords,
         1 - (documents.embedding <=> query_embedding) as similarity
     from documents
     order by documents.embedding <=> query_embedding

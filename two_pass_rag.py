@@ -1,7 +1,7 @@
 import os
 from typing import List, Dict, Any
 from dotenv import load_dotenv
-import openai
+from openai import OpenAI
 from supabase import create_client, Client
 import numpy as np
 from datetime import datetime
@@ -22,7 +22,7 @@ class TwoPassRAG:
         self.openai_api_key = os.getenv("OPENAI_API_KEY")
         if not self.openai_api_key:
             raise ValueError("OpenAI API key not found in environment variables")
-        openai.api_key = self.openai_api_key
+        self.client = OpenAI(api_key=self.openai_api_key)
         
         # Initialize Supabase
         self.supabase_url = os.getenv("SUPABASE_URL")
@@ -37,11 +37,11 @@ class TwoPassRAG:
     def get_embedding(self, text: str) -> List[float]:
         """Get embeddings from OpenAI API"""
         try:
-            response = openai.Embedding.create(
+            response = self.client.embeddings.create(
                 input=text,
                 model="text-embedding-ada-002"
             )
-            return response['data'][0]['embedding']
+            return response.data[0].embedding
         except Exception as e:
             logger.error(f"Error getting embedding: {e}")
             raise
@@ -58,69 +58,98 @@ class TwoPassRAG:
             
         return chunks
 
-    def store_document(self, text: str, metadata: Dict[str, Any] = None) -> None:
-        """Store document chunks and their embeddings in Supabase"""
+    def extract_keywords(self, text: str) -> List[str]:
+        """Extract keywords from text using GPT-4"""
         try:
-            chunks = self.chunk_text(text)
+            prompt = f"""Extract the most important keywords from the following text. 
+            Return only a comma-separated list of keywords, no other text.
+            
+            Text:
+            {text}"""
+            
+            response = self.client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": "You are a keyword extraction assistant. Return only comma-separated keywords, no other text."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.3
+            )
+            
+            keywords = response.choices[0].message.content.strip().split(',')
+            return [k.strip() for k in keywords]
+        except Exception as e:
+            logger.error(f"Error extracting keywords: {e}")
+            return []
+
+    def store_document(self, text: str, source: str = None, chunk_size: int = 500):
+        """Store document chunks in Supabase with embeddings"""
+        try:
+            chunks = self.chunk_text(text, chunk_size)
+            total_chunks = len(chunks)
             
             for i, chunk in enumerate(chunks):
+                # Get embedding for the chunk
                 embedding = self.get_embedding(chunk)
                 
-                # Prepare document data
-                doc_data = {
+                # Extract keywords for the chunk
+                keywords = self.extract_keywords(chunk)
+                
+                # Store in Supabase
+                self.supabase.table('documents').insert({
                     'content': chunk,
                     'embedding': embedding,
+                    'metadata': {'source': source} if source else {},
+                    'keywords': keywords,
                     'chunk_index': i,
-                    'total_chunks': len(chunks),
-                    'created_at': datetime.utcnow().isoformat(),
-                    'metadata': json.dumps(metadata or {})
-                }
-                
-                # Insert into Supabase
-                self.supabase.table('documents').insert(doc_data).execute()
-                
+                    'total_chunks': total_chunks,
+                    'created_at': datetime.now().isoformat()
+                }).execute()
+            
             logger.info(f"Stored {len(chunks)} chunks in Supabase")
             
         except Exception as e:
             logger.error(f"Error storing document: {e}")
             raise
 
-    def retrieve_relevant_chunks(self, query: str, top_k: int = 5) -> List[str]:
-        """Retrieve most relevant chunks using embedding similarity"""
+    def retrieve_relevant_chunks(self, query: str, match_count: int = 5) -> List[Dict[str, Any]]:
+        """Retrieve relevant chunks from Supabase based on query embedding"""
         try:
             query_embedding = self.get_embedding(query)
             
-            # Search for similar documents in Supabase
-            response = self.supabase.rpc(
-                'match_documents',
-                {
-                    'query_embedding': query_embedding,
-                    'match_count': top_k
-                }
-            ).execute()
+            # Get chunks by similarity search
+            chunks = self.supabase.table('documents').select(
+                'id',
+                'content',
+                'metadata',
+                f'1 - (embedding <=> cast({query_embedding} as vector)) as similarity'
+            ).order(
+                'similarity',
+                desc=True
+            ).limit(match_count).execute()
             
-            return [doc['content'] for doc in response.data]
+            return chunks.data if chunks.data else []
             
         except Exception as e:
             logger.error(f"Error retrieving chunks: {e}")
-            return []
+            raise
 
-    def generate_first_pass(self, query: str, context: List[str]) -> str:
+    def generate_first_pass(self, query: str, context: List[Dict[str, Any]]) -> str:
         """First pass: Generate initial response using retrieved context"""
         try:
             prompt = f"""Given the following context and question, generate a comprehensive initial response.
             Be factual and only use information from the provided context.
             
             Context:
-            {' '.join(context)}
+            {' '.join([chunk['content'] for chunk in context])}
             
             Question:
             {query}
             
             Initial Response:"""
             
-            response = openai.ChatCompletion.create(
-                model="gpt-4",
+            response = self.client.chat_completions.create(
+                model="gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": "You are a helpful assistant that generates accurate responses based on provided context."},
                     {"role": "user", "content": prompt}
@@ -134,7 +163,7 @@ class TwoPassRAG:
             logger.error(f"Error in first pass generation: {e}")
             return ""
 
-    def generate_second_pass(self, query: str, first_pass_response: str, context: List[str]) -> str:
+    def generate_second_pass(self, query: str, first_pass_response: str, context: List[Dict[str, Any]]) -> str:
         """Second pass: Refine and improve the initial response"""
         try:
             prompt = f"""Review and improve the following initial response. Ensure accuracy, clarity, and completeness.
@@ -145,15 +174,15 @@ class TwoPassRAG:
             {query}
             
             Context:
-            {' '.join(context)}
+            {' '.join([chunk['content'] for chunk in context])}
             
             Initial Response:
             {first_pass_response}
             
             Improved Response:"""
             
-            response = openai.ChatCompletion.create(
-                model="gpt-4",
+            response = self.client.chat_completions.create(
+                model="gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": "You are a helpful assistant that reviews and improves responses for accuracy and completeness."},
                     {"role": "user", "content": prompt}
@@ -227,13 +256,10 @@ def main():
             text = "\n".join(lines)
             
             if text.strip():
-                metadata = {
-                    "source": input("Enter document source (optional): ") or "unknown",
-                    "timestamp": datetime.utcnow().isoformat()
-                }
+                source = input("Enter document source (optional): ") or "unknown"
                 
                 try:
-                    rag.store_document(text, metadata)
+                    rag.store_document(text, source)
                     print("Document stored successfully!")
                 except Exception as e:
                     print(f"Error storing document: {e}")
