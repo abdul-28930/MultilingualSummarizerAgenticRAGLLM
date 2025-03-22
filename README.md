@@ -1,4 +1,4 @@
-# Multilingual Speech Recognition and Analysis
+Multilingual Speech Recognition and Analysis
 
 This project uses fine-tuned Whisper models and DeepSeek for multilingual speech recognition and analysis.
 

@@ -287,7 +287,7 @@ def main():
     
     # Navigation
     st.sidebar.title("Navigation")
-    page = st.sidebar.radio("Go to", ["Transcribe", "Summarize", "Chat"])
+    page = st.sidebar.radio("Go to", ["Transcribe", "Summarize", "Agent Interaction"])
 
     if page == "Transcribe":
         st.header("Upload Video/Audio")
@@ -450,9 +450,9 @@ def main():
         # else:
         #     st.warning("Please transcribe a video/audio file first!")
 
-    elif page == "Chat":
+    elif page == "Agent Interaction":
         if st.session_state.transcription:
-            st.header("Chat about the Content")
+            st.header("Query with the Agent")
             
             # Display chat messages
             for message in st.session_state.messages:
