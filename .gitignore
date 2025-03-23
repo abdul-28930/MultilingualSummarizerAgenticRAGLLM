@@ -117,3 +117,17 @@ coverage.xml
 *.mov
 *.flv
 *.mkv
+
+# Flask specific
+instance/
+.webassets-cache
+
+# API specific
+*.pyc
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Temporary files
+*.tmp
+*.temp

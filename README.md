@@ -9,7 +9,7 @@ This project uses fine-tuned Whisper models and DeepSeek for multilingual speech
    - For Linux: [Docker Engine](https://docs.docker.com/engine/install/) and [Docker Compose](https://docs.docker.com/compose/install/)
 
 2. Get required API keys:
-   - DeepSeek API key from [DeepSeek Platform](https://platform.deepseek.com)
+   - OpenAI API key for summarization and translation
    - Supabase credentials (if using Supabase)
 
 ## Setup
@@ -22,38 +22,66 @@ cd <repository-name>
 
 2. Create a `.env` file in the project root:
 ```bash
-DEEPSEEK_API_KEY=your_deepseek_api_key
+OPENAI_API_KEY=your_openai_api_key
 SUPABASE_URL=your_supabase_url
 SUPABASE_SERVICE_KEY=your_supabase_key
 DB_PASSWORD=your_database_password
 ```
 
-3. Start the application:
+## Running the Application
+
+### Option 1: Using Streamlit (Original UI)
+
+Run the Streamlit application:
 ```bash
-docker-compose up -d
+pip install -r requirements.txt
+streamlit run app.py
 ```
 
-4. Access the application:
-- Open your browser and go to: http://localhost:8501
+### Option 2: Using Flask API with React Frontend (New UI)
+
+1. Start the Flask API backend:
+```bash
+pip install -r requirements.txt
+python api.py
+```
+
+2. Start the React frontend:
+```bash
+cd frontend/multilingual-frontend-main
+npm install
+npm run dev
+```
+
+3. Access the application:
+- Streamlit UI: http://localhost:8501
+- React UI: http://localhost:5173
 
 ## Project Structure
 
 ```
 .
-├── Deepseek/                  # Main application code
-├── FineTune/                  # Fine-tuned Whisper models
-├── docker-compose.yml         # Docker services configuration
-├── Dockerfile                 # Main application container
+├── app.py                     # Streamlit application
+├── api.py                     # Flask API for frontend integration
+├── summary_evaluation.py      # Summary evaluation utilities
+├── extractive_summarizer.py   # Extractive summarization module
+├── abstractive_summarizer.py  # Abstractive summarization module
+├── frontend/                  # React frontend application
+│   └── multilingual-frontend-main/
+│       ├── src/               # React source code
+│       ├── public/            # Public assets
+│       └── package.json       # Frontend dependencies
 ├── requirements.txt           # Python dependencies
 └── .env                       # Environment variables (create this)
 ```
 
-## Stopping the Application
+## Features
 
-To stop the application:
-```bash
-docker-compose down
-```
+- Multilingual speech recognition (Arabic, Hindi)
+- Extractive and abstractive summarization
+- Summary translation to multiple languages
+- Interactive querying of summaries
+- Summary quality evaluation metrics
 
 ## Troubleshooting
 
@@ -64,8 +92,9 @@ sudo chown -R $USER:$USER .
 
 2. If the models aren't loading:
 - Ensure the models are in the correct directory
-- Check the model paths in `initialize.py`
+- Check the model paths in the application
 
-3. For database connection issues:
-- Verify your database credentials in `.env`
-- Check if the database container is running: `docker ps` 
+3. For API connection issues:
+- Verify your API keys in `.env`
+- Check if both backend and frontend are running
+- Look for the API status indicator in the bottom right of the React UI

@@ -1,0 +1,4 @@
+// Test Graph
+digraph {
+	A [label="Test Node"]
+}

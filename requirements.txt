@@ -24,3 +24,5 @@ nltk==3.8.1
 sentence-transformers==2.2.2
 bert-score==0.3.13
 plotly==5.18.0
+flask==2.0.1
+flask-cors==3.0.10
