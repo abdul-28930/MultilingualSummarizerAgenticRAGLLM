@@ -104,6 +104,29 @@ export const querySummary = async (prompt, context) => {
   }
 };
 
+// Generate flowchart
+export async function generateFlowchart(text, numKeywords = 10) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/flowchart`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ text, num_keywords: numKeywords }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to generate flowchart');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Flowchart generation error:', error);
+    throw error;
+  }
+}
+
 // Health check
 export const checkApiHealth = async () => {
   try {

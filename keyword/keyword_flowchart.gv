@@ -1,0 +1,19 @@
+// Keyword Flowchart
+digraph {
+	rankdir=TB size="8,8"
+	node [fontname=Arial shape=box style=filled]
+	"today meeting" [label="today meeting
+(0.0225)" fillcolor="#c1c1ff" fontcolor=black]
+	"machine learning" [label="machine learning
+(0.0266)" fillcolor="#b6b6ff" fontcolor=black]
+	"learning algorithm" [label="learning algorithm
+(0.0266)" fillcolor="#b6b6ff" fontcolor=black]
+	"customer service" [label="customer service
+(0.0529)" fillcolor="#6d6dff" fontcolor=white]
+	customer [label="customer
+(0.0917)" fillcolor="#0000ff" fontcolor=white]
+	customer -> "customer service"
+	"customer service" -> "machine learning"
+	"machine learning" -> "learning algorithm"
+	"learning algorithm" -> "today meeting"
+}

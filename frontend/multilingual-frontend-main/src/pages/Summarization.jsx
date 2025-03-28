@@ -2,6 +2,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate, useLocation } from "react-router-dom";
 import { generateSummary, translateText } from "../services/api";
+import FlowchartViewer from "../components/FlowchartViewer";
 
 export default function Summarization() {
   const location = useLocation();
@@ -13,6 +14,7 @@ export default function Summarization() {
   const [targetLanguage, setTargetLanguage] = useState("English");
   const [error, setError] = useState(null);
   const [metrics, setMetrics] = useState(null);
+  const [showFlowchart, setShowFlowchart] = useState(false);
   const navigate = useNavigate();
 
   const handleSummarization = async (type) => {
@@ -48,9 +50,8 @@ export default function Summarization() {
     }
   };
 
-  const generateFlowchart = (summaryText) => {
-    // Placeholder function: You can replace this with actual logic for flowchart generation
-    alert("Flowchart generation logic will go here!");
+  const toggleFlowchart = () => {
+    setShowFlowchart(!showFlowchart);
   };
 
   return (
@@ -172,7 +173,7 @@ export default function Summarization() {
             </motion.button>
 
             <motion.button
-              onClick={() => generateFlowchart(summary)}
+              onClick={toggleFlowchart}
               className="px-6 py-3 bg-gradient-to-r from-green-500 to-teal-500 text-white font-semibold rounded-xl shadow-lg hover:scale-105 hover:shadow-2xl transition-all"
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.95 }}
@@ -180,6 +181,18 @@ export default function Summarization() {
               Flowchart
             </motion.button>
           </div>
+        </motion.div>
+      )}
+      
+      {/* Flowchart Viewer */}
+      {showFlowchart && summary && (
+        <motion.div
+          className="w-full max-w-4xl mt-6"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          <FlowchartViewer text={summary} />
         </motion.div>
       )}
     </div>

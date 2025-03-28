@@ -8,6 +8,10 @@ import torch
 from transformers import pipeline
 from openai import OpenAI
 from summary_evaluation import SummaryEvaluator
+import yake
+import graphviz
+import base64
+from io import BytesIO
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -147,6 +151,74 @@ def get_chat_response(messages):
         logger.error(f"Error in getting response: {str(e)}")
         return f"Error in getting response: {str(e)}"
 
+def extract_keywords_yake(transcript, num_keywords=10):
+    """Extract keywords using YAKE (single-document keyword extraction)."""
+    # Set YAKE parameters
+    custom_kw_extractor = yake.KeywordExtractor(
+        lan="en",   # Language: English
+        n=2,        # Extract up to 2-word phrases (bigram keywords)
+        dedupLim=0.9,  # Avoid duplicate similar keywords
+        top=num_keywords
+    )
+
+    # Extract keywords
+    keywords = custom_kw_extractor.extract_keywords(transcript)
+    return keywords
+
+def create_keyword_flowchart_graphviz(keywords):
+    """Create a flowchart from keywords based on their importance using Graphviz."""
+    if not keywords:
+        return None
+
+    dot = graphviz.Digraph(comment='Keyword Flowchart')
+    dot.attr(rankdir='TB', size='8,8')
+    dot.attr('node', shape='box', style='filled', fontname='Arial')
+
+    # Determine max score for coloring
+    max_score = max([score for _, score in keywords]) if keywords else 1.0
+
+    for keyword, score in keywords:
+        color_intensity = int(255 * (score / max_score))
+        color = f"#{255 - color_intensity:02x}{255 - color_intensity:02x}ff"
+        dot.node(keyword, label=f"{keyword}\n({score:.4f})", fillcolor=color,
+                 fontcolor='white' if color_intensity > 128 else 'black')
+
+    # Connect keywords in order of importance
+    sorted_keywords = sorted(keywords, key=lambda x: x[1], reverse=True)
+    for i in range(len(sorted_keywords) - 1):
+        dot.edge(sorted_keywords[i][0], sorted_keywords[i + 1][0])
+
+    # Render to PNG and convert to base64
+    png_data = dot.pipe(format='png')
+    encoded_image = base64.b64encode(png_data).decode('utf-8')
+    return encoded_image
+
+def create_logical_flow_graphviz(transcript, keywords):
+    """Create a logical keyword flow based on keyword appearance in the text."""
+    keyword_positions = {keyword: transcript.lower().find(keyword.lower()) for keyword, _ in keywords}
+    keyword_positions = {k: v for k, v in keyword_positions.items() if v != -1}
+    sorted_keywords = sorted(keyword_positions.items(), key=lambda x: x[1])
+
+    dot = graphviz.Digraph(comment='Logical Keyword Flow')
+    dot.attr(rankdir='TB', size='8,8')
+    dot.attr('node', shape='box', style='filled', fontname='Arial')
+
+    max_score = max([score for _, score in keywords]) if keywords else 1.0
+
+    for keyword, position in sorted_keywords:
+        score = next((s for k, s in keywords if k == keyword), 0.1)
+        color_intensity = int(255 * (score / max_score))
+        color = f"#99{255 - color_intensity:02x}{255 - color_intensity:02x}"
+        dot.node(keyword, label=f"{keyword}\n({score:.4f})", fillcolor=color, fontcolor='black')
+
+    for i in range(len(sorted_keywords) - 1):
+        dot.edge(sorted_keywords[i][0], sorted_keywords[i + 1][0])
+
+    # Render to PNG and convert to base64
+    png_data = dot.pipe(format='png')
+    encoded_image = base64.b64encode(png_data).decode('utf-8')
+    return encoded_image
+
 # API Endpoints
 @app.route('/api/health', methods=['GET'])
 def health_check():
@@ -252,6 +324,32 @@ def api_query():
         return jsonify({"response": response})
     except Exception as e:
         logger.error(f"Error during query: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/flowchart', methods=['POST'])
+def api_flowchart():
+    data = request.json
+    if not data or 'text' not in data:
+        return jsonify({"error": "No text provided"}), 400
+    
+    text = data['text']
+    num_keywords = data.get('num_keywords', 10)
+    
+    try:
+        # Extract keywords
+        keywords = extract_keywords_yake(text, num_keywords=num_keywords)
+        
+        # Generate flowcharts
+        keyword_flowchart = create_keyword_flowchart_graphviz(keywords)
+        logical_flowchart = create_logical_flow_graphviz(text, keywords)
+        
+        return jsonify({
+            "keywords": [{"keyword": k, "score": s} for k, s in keywords],
+            "keyword_flowchart": keyword_flowchart,
+            "logical_flowchart": logical_flowchart
+        })
+    except Exception as e:
+        logger.error(f"Error generating flowchart: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
