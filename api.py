@@ -193,31 +193,108 @@ def create_keyword_flowchart_graphviz(keywords):
     encoded_image = base64.b64encode(png_data).decode('utf-8')
     return encoded_image
 
-def create_logical_flow_graphviz(transcript, keywords):
-    """Create a logical keyword flow based on keyword appearance in the text."""
-    keyword_positions = {keyword: transcript.lower().find(keyword.lower()) for keyword, _ in keywords}
+def create_logical_flow_graphviz(transcript, keywords, original_keywords=None):
+    """
+    Create a logical keyword flow based on keyword appearance in the text.
+    
+    Args:
+        transcript: The original text transcript
+        keywords: The keywords to display in the flowchart (can be translated)
+        original_keywords: The original untranslated keywords (used to find positions in the text)
+    """
+    # If original keywords are provided, use them to find positions in the text
+    # Otherwise, use the provided keywords (which might be translated)
+    position_keywords = original_keywords if original_keywords else keywords
+    
+    # Create a mapping from original keywords to translated keywords if both are provided
+    keyword_map = {}
+    if original_keywords and len(original_keywords) == len(keywords):
+        for i in range(len(original_keywords)):
+            keyword_map[original_keywords[i][0]] = keywords[i][0]
+    
+    # Find positions of keywords in the transcript
+    keyword_positions = {keyword: transcript.lower().find(keyword.lower()) for keyword, _ in position_keywords}
     keyword_positions = {k: v for k, v in keyword_positions.items() if v != -1}
     sorted_keywords = sorted(keyword_positions.items(), key=lambda x: x[1])
-
+    
+    # If no keywords found in the text, return empty image
+    if not sorted_keywords:
+        return None
+    
     dot = graphviz.Digraph(comment='Logical Keyword Flow')
     dot.attr(rankdir='TB', size='8,8')
     dot.attr('node', shape='box', style='filled', fontname='Arial')
-
+    
     max_score = max([score for _, score in keywords]) if keywords else 1.0
-
+    
     for keyword, position in sorted_keywords:
-        score = next((s for k, s in keywords if k == keyword), 0.1)
+        # If we have a mapping, use the translated keyword for display
+        display_keyword = keyword_map.get(keyword, keyword) if keyword_map else keyword
+        
+        # Find the score for this keyword
+        score = next((s for k, s in position_keywords if k == keyword), 0.1)
+        
         color_intensity = int(255 * (score / max_score))
         color = f"#99{255 - color_intensity:02x}{255 - color_intensity:02x}"
-        dot.node(keyword, label=f"{keyword}\n({score:.4f})", fillcolor=color, fontcolor='black')
-
-    for i in range(len(sorted_keywords) - 1):
-        dot.edge(sorted_keywords[i][0], sorted_keywords[i + 1][0])
-
+        
+        # Use the translated/display keyword in the node label
+        dot.node(display_keyword, label=f"{display_keyword}\n({score:.4f})", fillcolor=color, fontcolor='black')
+    
+    # Connect nodes using the display keywords
+    sorted_display_keywords = []
+    for keyword, _ in sorted_keywords:
+        display_keyword = keyword_map.get(keyword, keyword) if keyword_map else keyword
+        sorted_display_keywords.append(display_keyword)
+    
+    for i in range(len(sorted_display_keywords) - 1):
+        dot.edge(sorted_display_keywords[i], sorted_display_keywords[i + 1])
+    
     # Render to PNG and convert to base64
     png_data = dot.pipe(format='png')
     encoded_image = base64.b64encode(png_data).decode('utf-8')
     return encoded_image
+
+def translate_keywords_to_english(keywords, client):
+    """Translate a list of keywords to English using OpenAI API."""
+    if not keywords:
+        return []
+    
+    try:
+        # Extract just the keyword texts
+        keyword_texts = [keyword for keyword, _ in keywords]
+        
+        # Create a prompt for translation
+        prompt = f"""Translate the following keywords to English. Keep them concise and maintain their technical meaning:
+        
+        Keywords:
+        {', '.join(keyword_texts)}
+        
+        Return only the translated keywords in the same order, separated by commas."""
+
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "system", "content": "You are a professional translator. Provide accurate translations of keywords to English."},
+                     {"role": "user", "content": prompt}],
+            temperature=0.3,
+            max_tokens=500
+        )
+        
+        # Parse the response
+        translated_text = response.choices[0].message.content
+        translated_keywords = [kw.strip() for kw in translated_text.split(',')]
+        
+        # Make sure we have the same number of translations as original keywords
+        if len(translated_keywords) != len(keywords):
+            logger.warning(f"Translation returned {len(translated_keywords)} keywords, but expected {len(keywords)}. Using original keywords.")
+            return keywords
+        
+        # Pair translated keywords with original scores
+        translated_keywords_with_scores = [(translated_keywords[i], keywords[i][1]) for i in range(len(keywords))]
+        
+        return translated_keywords_with_scores
+    except Exception as e:
+        logger.error(f"Error translating keywords: {str(e)}")
+        return keywords  # Return original keywords if translation fails
 
 # API Endpoints
 @app.route('/api/health', methods=['GET'])
@@ -337,14 +414,27 @@ def api_flowchart():
     
     try:
         # Extract keywords
-        keywords = extract_keywords_yake(text, num_keywords=num_keywords)
+        original_keywords = extract_keywords_yake(text, num_keywords=num_keywords)
         
-        # Generate flowcharts
-        keyword_flowchart = create_keyword_flowchart_graphviz(keywords)
-        logical_flowchart = create_logical_flow_graphviz(text, keywords)
+        # Initialize OpenAI client for translation
+        client = initialize_openai_client()
+        
+        # Translate keywords to English if not already in English
+        if client:
+            translated_keywords = translate_keywords_to_english(original_keywords, client)
+        else:
+            translated_keywords = original_keywords
+            logger.warning("OpenAI client not initialized. Using original keywords without translation.")
+        
+        # Generate flowcharts with translated keywords
+        keyword_flowchart = create_keyword_flowchart_graphviz(translated_keywords)
+        
+        # For logical flow, pass both translated and original keywords
+        logical_flowchart = create_logical_flow_graphviz(text, translated_keywords, original_keywords)
         
         return jsonify({
-            "keywords": [{"keyword": k, "score": s} for k, s in keywords],
+            "keywords": [{"keyword": k, "score": s} for k, s in original_keywords],  # Original keywords for reference
+            "translated_keywords": [{"keyword": k, "score": s} for k, s in translated_keywords],  # Translated keywords
             "keyword_flowchart": keyword_flowchart,
             "logical_flowchart": logical_flowchart
         })
